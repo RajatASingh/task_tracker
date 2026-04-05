@@ -42,34 +42,87 @@ for col in ["Remark", "Hours Spent", "Project"]:
 df["Due Date"] = pd.to_datetime(df["Due Date"], errors="coerce")
 df["Assigned Date"] = pd.to_datetime(df["Assigned Date"], errors="coerce")
 
+import plotly.express as px
+
 # ================= DASHBOARD VIEW =================
 if view == "Dashboard":
     st.subheader("📊 Dashboard Overview")
 
+    # ===================== METRICS =====================
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total", len(df))
     col2.metric("Pending", len(df[df['Status'] == 'Pending']))
     col3.metric("In Progress", len(df[df['Status'] == 'In Progress']))
     col4.metric("Completed", len(df[df['Status'] == 'Completed']))
+    st.divider()
 
-    st.markdown("### 📊 Status Distribution")
-    st.bar_chart(df["Status"].value_counts())
+    # ===================== CHARTS (SIDE BY SIDE) =====================
+    col1, col2 = st.columns(2)
 
-    st.markdown("### 🥧 Priority Distribution")
-    st.bar_chart(df["Priority"].value_counts())
 
-    st.markdown("### 📅 Weekly Summary")
-    last_7_days = df[
-        df["Assigned Date"] >= pd.Timestamp.today() - pd.Timedelta(days=7)
-    ]
-    st.write(last_7_days["Status"].value_counts())
+    # -------- STATUS BAR CHART --------
+    with col1:
+        st.markdown("##### Status Distribution")
+        status_counts = df["Status"].value_counts().reset_index()
+        status_counts.columns = ["Status", "Count"]
 
-    # Overdue
+        fig_bar = px.bar(
+            status_counts,
+            x="Status",
+            y="Count",
+            text="Count",
+        )
+
+        fig_bar.update_layout(
+            height=400,
+            margin=dict(l=20, r=20, t=30, b=20)
+        )
+
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    # -------- PRIORITY DONUT CHART --------
+    with col2:
+        st.markdown("##### Priority Distribution")
+
+        priority_counts = df["Priority"].value_counts().reset_index()
+        priority_counts.columns = ["Priority", "Count"]
+
+        fig_donut = px.pie(
+            priority_counts,
+            names="Priority",
+            values="Count",
+            hole=0.5  # 👈 This makes it a donut
+        )
+
+        fig_donut.update_layout(
+            height=400,
+            margin=dict(l=20, r=20, t=30, b=20)
+        )
+
+        st.plotly_chart(fig_donut, use_container_width=True)
+
+    # ===================== OVERDUE ALERT =====================
     today = pd.to_datetime(date.today())
-    overdue = df[(df["Due Date"] < today) & (df["Status"] != "Completed")]
+
+    overdue = df[
+        (df["Due Date"] < today) & (df["Status"] != "Completed")
+    ]
 
     if not overdue.empty:
         st.error(f"⚠️ {len(overdue)} tasks are overdue!")
+
+        st.markdown("### 🚨 Overdue Tasks")
+
+        st.dataframe(
+            overdue[[
+                "Task Name",
+                "Project",
+                "Due Date",
+                "Priority",
+                "Status"
+            ]],
+            use_container_width=True
+        )
 
 # ================= TASK MANAGER VIEW =================
 if view == "Task Manager":
@@ -136,6 +189,14 @@ if view == "Task Manager":
         filtered_df = filtered_df[
             filtered_df["Task Name"].str.contains(search, case=False, na=False)
         ]
+
+    # # Overall Tasks Summary
+    # st.subheader("Overall Tasks Summary")
+    # col1, col2, col3, col4 = st.columns(4)
+    # col1.metric("Total Tasks", len(df))
+    # col2.metric("Pending", len(df[df['Status'] == 'Pending']))
+    # col3.metric("In Progress", len(df[df['Status'] == 'In Progress']))
+    # col4.metric("Completed", len(df[df['Status'] == 'Completed']))
 
     # Task list
     st.subheader("📋 Tasks")
